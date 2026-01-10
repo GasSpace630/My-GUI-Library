@@ -1,0 +1,1 @@
+g++ main.cpp   -o game   -I$HOME/raylib/src   -L$HOME/raylib/src   -lraylib   -lm -ldl -lpthread   -lX11 && ./game
