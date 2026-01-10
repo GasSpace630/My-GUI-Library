@@ -1,5 +1,10 @@
 #include "raylib.h"
+#include "memory"
+#include "vector"
 #include "string"
+#include <algorithm>
+#include <memory>
+#include <vector>
 
 // Base UI class 'Control'
 class Control {
@@ -8,17 +13,49 @@ class Control {
     bool visible = true;
     bool enabled = true;
 
+    Control* parent = nullptr; // parent
+    std::vector<std::unique_ptr<Control>> children; // children
+
     public:
     virtual ~Control() = default;
 
-    virtual void Update() {}
-    virtual void Draw() {}
+    // Add a control object as a child to this object
+    void addChild(std::unique_ptr<Control> child) {
+        if (!child) return;
+        child -> parent = this;
+        children.push_back(std::move(child));
+    }
+    // Rmove a child
+    // the 'i' may get out of range if not carefull
+    void removeChild(Control* child) {
+        for (auto i = children.begin(); i != children.end(); ++i) {
+            if (i->get() == child) {
+                (*i)->parent = nullptr;
+                children.erase(i); // DESTROYS child
+                return;
+            }
+        }
+    }
 
-    virtual void setPosition(int xPosition, int yPosition) {position = Vector2{(float)xPosition, (float)yPosition};}
+    Control* getParent() const {return parent;}
+
+    virtual void setPosition(int x, int y) {
+        position = Vector2{(float)x, (float)y};
+    }
     Vector2 getPosition() const {return position;}
 
     void setVisible(bool visibility) {visible = visibility;}
     bool isVisible() const {return visible;}
+
+    virtual void Update() {
+        for (auto& child : children)
+            child -> Update();
+    }
+    virtual void Draw() {
+        if (!visible) {return;}
+        for (auto& child : children)
+            child -> Draw();
+    }
 };
 // for base classes with size (width and height)
 class RectControl : public Control{
@@ -26,9 +63,12 @@ class RectControl : public Control{
     Vector2 size = Vector2{0, 0};
 
     public:
-    void setSize(int width, int height) {size = Vector2{(float)width, (float)height};}
+    void setSize(int width, int height) {
+        size = Vector2{(float)width, (float)height};
+    }
+    // Get the size Vector2
     Vector2 getSize() const {return size;}
-    
+    // Get the bounding rectangle object
     Rectangle getRect() const {return {position.x, position.y, size.x, size.y};}
 };
 
@@ -38,8 +78,8 @@ class Panel : public RectControl{
     Color color = WHITE;
     Vector2 padding = Vector2{0, 0};
 
-    void setpadding(int xPadding, int yPadding) {
-        padding = Vector2{(float)xPadding, (float)yPadding};
+    void setpadding(int x, int y) {
+        padding = Vector2{(float)x, (float)y};
     }
 
     void Draw() override{
@@ -55,63 +95,45 @@ class Label : public Control{
     int fontSize = 16;
     int textSize = 0;
     Color color = BLACK;
-    Panel background;
+    //Panel background;
 
     public:
     bool bgVisible = true; // Whether to show BG or not
 
-    explicit Label(const std::string newText, int xPosition, int yPosition, int newFontSize)
+    explicit Label(const std::string newText, int x, int y, int newFontSize)
     : text(newText), fontSize(newFontSize){
-        position = Vector2{(float)xPosition, (float)yPosition};
+        position = Vector2{(float)x, (float)y};
         textSize = MeasureText(text.c_str(), fontSize);
-        rePositionBg();
     }
 
     void setText(std::string newText) {
         text = newText;
         textSize = MeasureText(text.c_str(), fontSize);
-        rePositionBg();
     }
     std::string getText() const {return text;}
 
     void setFontSize(int newFontSize) {
         fontSize = newFontSize;
-        rePositionBg();
     }
     int getFontSize() {return fontSize;}
+
     int getTextSize() {return textSize;}
 
-    void setPosition(int xPosition, int yPosition) override {
-        Control::setPosition(xPosition, yPosition);
-        rePositionBg();
-    }
-    void setBgPadding(int xPadding, int yPadding) {
-        background.setpadding(xPadding, yPadding);
-        rePositionBg();
+    void setPosition(int x, int y) override {
+        Control::setPosition(x, y);
     }
     void setTextColor(Color newColor) {
         color = newColor;
-    }
-    void setBgColor(Color newColor) {
-        background.color = newColor;
     }
 
     void Draw() override{
         if (!visible) {return;}
         if (bgVisible) {
-            background.Draw();
-            DrawText(text.c_str(), position.x + background.padding.x/2, position.y + background.padding.y/2, fontSize, color);
+            DrawText(text.c_str(), position.x, position.y, fontSize, color);
         }
         else {
             DrawText(text.c_str(), position.x, position.y, fontSize, color);
         }
-    }
-
-    private:
-    // used to set the size and position of BG correctly 
-    void rePositionBg() {
-        background.setPosition(position.x, position.y);
-        background.setSize((float)textSize, (float)fontSize);
     }
 };
 
@@ -129,10 +151,10 @@ class Button : public RectControl{
     bool pressed = false;
     bool hovered = false;
 
-    Button(std::string btnText, int xPosition, int yPosition, int xPadding, int yPadding)
-    : label(btnText, xPosition, yPosition, 16)
+    Button(std::string btnText, int x, int y, int xPadding, int yPadding)
+    : label(btnText, x, y, 16)
     {
-        setPosition(xPosition, yPosition);
+        setPosition(x, y);
         label.setText(btnText);
         // to center text
         float textWidth = label.getTextSize() + xPadding; 
@@ -148,8 +170,8 @@ class Button : public RectControl{
     }
 
     // Chnages the position of the button (panel and text)
-    void setPosition(int xPosition, int yPosition) override{
-        Control::setPosition(xPosition, yPosition);
+    void setPosition(int x, int y) override{
+        Control::setPosition(x, y);
         background.setPosition(position.x, position.y);
         int textXPosition = position.x + (background.getSize().x/2.0f) - MeasureText(label.getText().c_str(), label.getFontSize())/2.0f;
         int textYPosition = position.y + (background.getSize().y/2.0f) - (label.getFontSize()/2.0f);
@@ -198,11 +220,9 @@ int main(void) {
     // The Label
     Label testLbl = Label("This is a Test Label Object", 10, 10, 16);
     testLbl.setTextColor(BLUE);
-    testLbl.setBgColor(BLACK);
     testLbl.setText("dkjcskjgdck");
     testLbl.setFontSize(20);
     testLbl.setPosition(100, 30);
-    testLbl.setBgPadding(30, 40);
 
     // The Button
     Button testBtn = Button("The test Button", 60, 200, 10, 10);
