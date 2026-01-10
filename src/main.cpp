@@ -85,6 +85,7 @@ class Panel : public RectControl{
     void Draw() override{
         // TODO: Add rounded corners
         DrawRectangle(position.x, position.y, size.x + padding.x, size.y + padding.y, color);
+        Control::Draw();
     }
 };
 
@@ -95,14 +96,11 @@ class Label : public Control{
     int fontSize = 16;
     int textSize = 0;
     Color color = BLACK;
-    //Panel background;
 
     public:
-    bool bgVisible = true; // Whether to show BG or not
 
-    explicit Label(const std::string newText, int x, int y, int newFontSize)
+    explicit Label(const std::string newText, int newFontSize)
     : text(newText), fontSize(newFontSize){
-        position = Vector2{(float)x, (float)y};
         textSize = MeasureText(text.c_str(), fontSize);
     }
 
@@ -128,16 +126,12 @@ class Label : public Control{
 
     void Draw() override{
         if (!visible) {return;}
-        if (bgVisible) {
-            DrawText(text.c_str(), position.x, position.y, fontSize, color);
-        }
-        else {
-            DrawText(text.c_str(), position.x, position.y, fontSize, color);
-        }
+        DrawText(text.c_str(), position.x, position.y, fontSize, color);
     }
 };
 
 // A button to press
+// TODO: Refactor for parent-child system.
 class Button : public RectControl{
     private:
     Label label;
@@ -152,7 +146,7 @@ class Button : public RectControl{
     bool hovered = false;
 
     Button(std::string btnText, int x, int y, int xPadding, int yPadding)
-    : label(btnText, x, y, 16)
+    : label(btnText, 16)
     {
         setPosition(x, y);
         label.setText(btnText);
@@ -165,7 +159,6 @@ class Button : public RectControl{
         background.setPosition(position.x, position.y);
         background.color = GRAY;
         background.setSize(textWidth, textHeight);
-        label.bgVisible = false;
         label.setPosition(centerX - (textWidth/2), centerY - (textHeight/2));
     }
 
@@ -217,20 +210,23 @@ int main(void) {
     SetTargetFPS(60);
 
     // Testin stuff
-    // The Label
-    Label testLbl = Label("This is a Test Label Object", 10, 10, 16);
-    testLbl.setTextColor(BLUE);
-    testLbl.setText("dkjcskjgdck");
-    testLbl.setFontSize(20);
-    testLbl.setPosition(100, 30);
+    // the Panel
+    auto testPanel = std::make_unique<Panel>();
+    testPanel -> setPosition(10, 10);
+    testPanel -> setSize(200, 80);
+    // the Label
+    auto testLbl = std::make_unique<Label>("Hello", 16);
+    testLbl -> setPosition(10, 10);
+    testPanel -> addChild(std::move(testLbl));
+    testLbl = nullptr;
 
     // The Button
     Button testBtn = Button("The test Button", 60, 200, 10, 10);
     testBtn.setPosition(300, 10);
 
-    Label titleLbl = Label("My GUI Library!", 0, 0, 20);
-    titleLbl.setPosition(GetScreenWidth()/2.0f - titleLbl.getTextSize()/2.0f, GetScreenHeight()/2.0f - titleLbl.getFontSize()/2.0f);
-    titleLbl.setTextColor(GRAY);
+    auto titleLbl = std::make_unique<Label>("My GUI Library!", 20);
+    titleLbl -> setPosition(GetScreenWidth()/2.0f - titleLbl -> getTextSize()/2.0f, GetScreenHeight()/2.0f - titleLbl -> getFontSize()/2.0f);
+    titleLbl -> setTextColor(GRAY);
 
     while(!WindowShouldClose()) {
 
@@ -239,9 +235,10 @@ int main(void) {
         BeginDrawing();
         
         ClearBackground(RAYWHITE);
-        titleLbl.Draw();
-        testLbl.Draw();
+        titleLbl -> Draw();
         testBtn.Draw();
+
+        testPanel -> Draw();
         
         EndDrawing();
     }
