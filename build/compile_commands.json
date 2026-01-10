@@ -1,0 +1,7 @@
+[
+{
+  "directory": "/home/gasspace/raystuff/my_guilib/build",
+  "command": "/usr/bin/c++ -DGRAPHICS_API_OPENGL_33 -DPLATFORM_DESKTOP -DUSE_LIBTYPE_SHARED  -std=gnu++17 -o CMakeFiles/my_guilib.dir/src/main.cpp.o -c /home/gasspace/raystuff/my_guilib/src/main.cpp",
+  "file": "/home/gasspace/raystuff/my_guilib/src/main.cpp"
+}
+]

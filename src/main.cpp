@@ -1,10 +1,5 @@
-// Run Using this : g++ main.cpp   -o game   -I$HOME/raylib/src   -L$HOME/raylib/src   -lraylib   -lm -ldl -lpthread   -lX11
-
-// Stuff todo: setup the base control class for every ui elements!!!
-
 #include "raylib.h"
 #include "string"
-
 
 // Base UI class 'Control'
 class Control {
@@ -34,18 +29,20 @@ class RectControl : public Control{
     void setSize(int width, int height) {size = Vector2{(float)width, (float)height};}
     Vector2 getSize() const {return size;}
     
-    // MAYBE: add a function to return the Rectnagle
+    Rectangle getRect() const {return {position.x, position.y, size.x, size.y};}
 };
 
 // Used as a Background for Ui elements
 class Panel : public RectControl{
     public:
-    //Vector2 position = Vector2{0, 0};
-    //Vector2 size = Vector2{0, 0};
     Color color = WHITE;
     Vector2 padding = Vector2{0, 0};
 
-    void Draw() {
+    void setpadding(int xPadding, int yPadding) {
+        padding = Vector2{(float)xPadding, (float)yPadding};
+    }
+
+    void Draw() override{
         // TODO: Add rounded corners
         DrawRectangle(position.x, position.y, size.x + padding.x, size.y + padding.y, color);
     }
@@ -56,12 +53,11 @@ class Label : public Control{
     private:
     std::string text = "";
     int fontSize = 16;
-    // Vector2 position;
     Color color = BLACK;
     Panel background;
 
     public:
-    bool bgActive = true; // Whether to show BG or not
+    bool bgVisible = true; // Whether to show BG or not
 
     explicit Label(const std::string newText, int xPosition, int yPosition, int newFontSize)
     : text(newText), fontSize(newFontSize){
@@ -73,18 +69,17 @@ class Label : public Control{
         text = newText;
         rePositionBg();
     }
+    std::string getText() const {return text;}
     void setFontSize(int newFontSize) {
         fontSize = newFontSize;
         rePositionBg();
     }
     void setPosition(int xPosition, int yPosition) override {
         Control::setPosition(xPosition, yPosition);
-        //position = newPosition;
-        //background.position = position;
         rePositionBg();
     }
-    void setBgPadding(int widthPad, int heightPad) {
-        background.padding = Vector2{(float)widthPad, (float)heightPad};
+    void setBgPadding(int xPadding, int yPadding) {
+        background.setpadding(xPadding, yPadding);
         rePositionBg();
     }
     void setTextColor(Color newColor) {
@@ -94,9 +89,9 @@ class Label : public Control{
         background.color = newColor;
     }
 
-    void Draw() {
+    void Draw() override{
         if (!visible) {return;}
-        if (bgActive) {
+        if (bgVisible) {
             background.Draw();
             DrawText(text.c_str(), position.x + background.padding.x/2, position.y + background.padding.y/2, fontSize, color);
         }
@@ -109,12 +104,7 @@ class Label : public Control{
     // used to set the size and position of BG correctly 
     void rePositionBg() {
         background.setPosition(position.x, position.y);
-        //background.position = position;
         background.setSize((float)MeasureText(text.c_str(), fontSize), (float)fontSize);
-        //background.size = {
-        //    (float)MeasureText(text.c_str(), fontSize),
-        //    (float)fontSize
-        //};
     }
 };
 
@@ -123,18 +113,63 @@ class Button : public RectControl{
     private:
     Label label;
     Panel background;
+    Color normalColor = GRAY;
+    Color hoveredColor = LIGHTGRAY;
+    Color pressedColor = DARKGRAY;
 
     public:
     bool pressed = false;
     bool hovered = false;
 
-    Button(std::string btnText, int xPosition, int yPosition)
+    Button(std::string btnText, int xPosition, int yPosition, int xPadding, int yPadding)
     : label(btnText, xPosition, yPosition, 16)
     {
-        setPosition(xPosition, yPosition);
+        // to center text
+        float textWidth = MeasureText(btnText.c_str(), 16) + xPadding; 
+        float textHeight = 16 + yPadding;
+        float centerX = xPosition + (textWidth / 2.0f) + (xPadding/2.0f);
+        float centerY = yPosition + (textHeight / 2.0f) + (yPadding/2.0f);
+        // ---
+        
+        background.setPosition(xPosition, yPosition);
+        background.color = GRAY;
+        background.setSize(textWidth, textHeight);
+        label.bgVisible = false;
+        label.setPosition(centerX - (textWidth/2), centerY - (textHeight/2));
     }
 
-    void Draw() {
+    // void setTextPosition(int xPosition, int yPosition) {
+    //     float textWidth = MeasureText(label.getText().c_str(), 16) + width;
+    //     float textHeight = 16 + height;
+    //     float centerX = xPosition + (textWidth / 2.0f) + (width/2.0f);
+    //     float centerY = yPosition + (textHeight / 2.0f) + (height/2.0f);
+    //     label.setPosition(centerX - (textWidth/2), centerY - (textHeight/2));
+    // }
+
+    void Update() override{
+        Vector2 mousePosition = GetMousePosition();
+        Rectangle bgRect = background.getRect();
+
+        hovered = CheckCollisionPointRec(mousePosition, bgRect);
+        if (hovered) {
+            background.color = hoveredColor;
+            if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+                background.color = pressedColor;
+                pressed = true;
+            }
+            if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
+                background.color = hoveredColor;
+                pressed = false;
+            }
+        }
+        else {
+            background.color = normalColor;
+            hovered = false;
+            pressed = false;
+        }
+    }
+
+    void Draw() override{
         background.Draw();
         label.Draw();
     }
@@ -159,9 +194,12 @@ int main(void) {
     testLbl.setBgPadding(30, 40);
 
     // The Button
-    Button testBtn = Button("This is a test Button", 20, 200);
+    Button testBtn = Button("The test Button", 60, 200, 10, 10);
 
     while(!WindowShouldClose()) {
+
+        testBtn.Update();
+
         BeginDrawing();
         
         ClearBackground(RAYWHITE);

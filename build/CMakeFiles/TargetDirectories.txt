@@ -1,0 +1,3 @@
+/home/gasspace/raystuff/my_guilib/build/CMakeFiles/my_guilib.dir
+/home/gasspace/raystuff/my_guilib/build/CMakeFiles/edit_cache.dir
+/home/gasspace/raystuff/my_guilib/build/CMakeFiles/rebuild_cache.dir
