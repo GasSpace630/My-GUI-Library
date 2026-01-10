@@ -32,7 +32,7 @@ class RectControl : public Control{
     Rectangle getRect() const {return {position.x, position.y, size.x, size.y};}
 };
 
-// Used as a Background for Ui elements
+// Used as a Background to hold Ui elements
 class Panel : public RectControl{
     public:
     Color color = WHITE;
@@ -53,6 +53,7 @@ class Label : public Control{
     private:
     std::string text = "";
     int fontSize = 16;
+    int textSize = 0;
     Color color = BLACK;
     Panel background;
 
@@ -62,18 +63,24 @@ class Label : public Control{
     explicit Label(const std::string newText, int xPosition, int yPosition, int newFontSize)
     : text(newText), fontSize(newFontSize){
         position = Vector2{(float)xPosition, (float)yPosition};
+        textSize = MeasureText(text.c_str(), fontSize);
         rePositionBg();
     }
 
     void setText(std::string newText) {
         text = newText;
+        textSize = MeasureText(text.c_str(), fontSize);
         rePositionBg();
     }
     std::string getText() const {return text;}
+
     void setFontSize(int newFontSize) {
         fontSize = newFontSize;
         rePositionBg();
     }
+    int getFontSize() {return fontSize;}
+    int getTextSize() {return textSize;}
+
     void setPosition(int xPosition, int yPosition) override {
         Control::setPosition(xPosition, yPosition);
         rePositionBg();
@@ -104,7 +111,7 @@ class Label : public Control{
     // used to set the size and position of BG correctly 
     void rePositionBg() {
         background.setPosition(position.x, position.y);
-        background.setSize((float)MeasureText(text.c_str(), fontSize), (float)fontSize);
+        background.setSize((float)textSize, (float)fontSize);
     }
 };
 
@@ -113,6 +120,7 @@ class Button : public RectControl{
     private:
     Label label;
     Panel background;
+    // Default button colors
     Color normalColor = GRAY;
     Color hoveredColor = LIGHTGRAY;
     Color pressedColor = DARKGRAY;
@@ -124,28 +132,31 @@ class Button : public RectControl{
     Button(std::string btnText, int xPosition, int yPosition, int xPadding, int yPadding)
     : label(btnText, xPosition, yPosition, 16)
     {
+        setPosition(xPosition, yPosition);
+        label.setText(btnText);
         // to center text
-        float textWidth = MeasureText(btnText.c_str(), 16) + xPadding; 
+        float textWidth = label.getTextSize() + xPadding; 
         float textHeight = 16 + yPadding;
-        float centerX = xPosition + (textWidth / 2.0f) + (xPadding/2.0f);
-        float centerY = yPosition + (textHeight / 2.0f) + (yPadding/2.0f);
-        // ---
-        
-        background.setPosition(xPosition, yPosition);
+        float centerX = position.x + (textWidth / 2.0f) + (xPadding/2.0f);
+        float centerY = position.y + (textHeight / 2.0f) + (yPadding/2.0f);
+        // --- Default values
+        background.setPosition(position.x, position.y);
         background.color = GRAY;
         background.setSize(textWidth, textHeight);
         label.bgVisible = false;
         label.setPosition(centerX - (textWidth/2), centerY - (textHeight/2));
     }
 
-    // void setTextPosition(int xPosition, int yPosition) {
-    //     float textWidth = MeasureText(label.getText().c_str(), 16) + width;
-    //     float textHeight = 16 + height;
-    //     float centerX = xPosition + (textWidth / 2.0f) + (width/2.0f);
-    //     float centerY = yPosition + (textHeight / 2.0f) + (height/2.0f);
-    //     label.setPosition(centerX - (textWidth/2), centerY - (textHeight/2));
-    // }
+    // Chnages the position of the button (panel and text)
+    void setPosition(int xPosition, int yPosition) override{
+        Control::setPosition(xPosition, yPosition);
+        background.setPosition(position.x, position.y);
+        int textXPosition = position.x + (background.getSize().x/2.0f) - MeasureText(label.getText().c_str(), label.getFontSize())/2.0f;
+        int textYPosition = position.y + (background.getSize().y/2.0f) - (label.getFontSize()/2.0f);
+        label.setPosition(textXPosition, textYPosition);
+    }
 
+    // Pressing and hovering
     void Update() override{
         Vector2 mousePosition = GetMousePosition();
         Rectangle bgRect = background.getRect();
@@ -195,6 +206,11 @@ int main(void) {
 
     // The Button
     Button testBtn = Button("The test Button", 60, 200, 10, 10);
+    testBtn.setPosition(300, 10);
+
+    Label titleLbl = Label("My GUI Library!", 0, 0, 20);
+    titleLbl.setPosition(GetScreenWidth()/2.0f - titleLbl.getTextSize()/2.0f, GetScreenHeight()/2.0f - titleLbl.getFontSize()/2.0f);
+    titleLbl.setTextColor(GRAY);
 
     while(!WindowShouldClose()) {
 
@@ -203,11 +219,7 @@ int main(void) {
         BeginDrawing();
         
         ClearBackground(RAYWHITE);
-        const char* text = "My GUI Library";
-        int textSize = 20;
-        int textWidth = MeasureText(text, textSize);
-        DrawText(text, (windowWidth / 2 - textWidth / 2), windowHeight/2, textSize, GRAY);
-
+        titleLbl.Draw();
         testLbl.Draw();
         testBtn.Draw();
         
