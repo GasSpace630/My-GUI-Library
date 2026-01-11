@@ -1,4 +1,5 @@
 #include "raylib.h"
+#include "iostream"
 #include "memory"
 #include "vector"
 #include "string"
@@ -10,6 +11,7 @@
 class Control {
     protected:
     Vector2 position = Vector2{0, 0};
+
     bool visible = true;
     bool enabled = true;
 
@@ -40,11 +42,22 @@ class Control {
     Control* getParent() const {return parent;}
 
     virtual void setPosition(int x, int y) {
-        position = Vector2{(float)x, (float)y};
+            position = Vector2{(float)x, (float)y};
     }
+
     Vector2 getPosition() const {return position;}
 
-    void setVisible(bool visibility) {visible = visibility;}
+    Vector2 getWorldPosition() {
+        if (parent) {
+            Vector2 parentPos = parent -> getWorldPosition();
+            return Vector2{parentPos.x + position.x, parentPos.y + position.y};
+        }
+        else {
+            return position;
+        }
+    }
+
+    void setVisibility(bool visibility) {visible = visibility;}
     bool isVisible() const {return visible;}
 
     virtual void Update() {
@@ -66,9 +79,9 @@ class RectControl : public Control{
     void setSize(int width, int height) {
         size = Vector2{(float)width, (float)height};
     }
-    // Get the size Vector2
+
     Vector2 getSize() const {return size;}
-    // Get the bounding rectangle object
+
     Rectangle getRect() const {return {position.x, position.y, size.x, size.y};}
 };
 
@@ -78,8 +91,12 @@ class Panel : public RectControl{
     Color color = WHITE;
     Vector2 padding = Vector2{0, 0};
 
-    void setpadding(int x, int y) {
-        padding = Vector2{(float)x, (float)y};
+    void setColor(Color newColor) {
+        color = newColor;
+    }
+
+    void setPadding(int xPadding, int yPadding) {
+        padding = Vector2{(float)xPadding, (float)yPadding};
     }
 
     void Draw() override{
@@ -126,7 +143,9 @@ class Label : public Control{
 
     void Draw() override{
         if (!visible) {return;}
-        DrawText(text.c_str(), position.x, position.y, fontSize, color);
+
+        DrawText(text.c_str(), getWorldPosition().x, getWorldPosition().y, fontSize, color);
+        Control::Draw();
     }
 };
 
@@ -166,9 +185,9 @@ class Button : public RectControl{
     void setPosition(int x, int y) override{
         Control::setPosition(x, y);
         background.setPosition(position.x, position.y);
-        int textXPosition = position.x + (background.getSize().x/2.0f) - MeasureText(label.getText().c_str(), label.getFontSize())/2.0f;
-        int textYPosition = position.y + (background.getSize().y/2.0f) - (label.getFontSize()/2.0f);
-        label.setPosition(textXPosition, textYPosition);
+        int testX = position.x + (background.getSize().x/2.0f) - MeasureText(label.getText().c_str(), label.getFontSize())/2.0f;
+        int textY = position.y + (background.getSize().y/2.0f) - (label.getFontSize()/2.0f);
+        label.setPosition(testX, textY);
     }
 
     // Pressing and hovering
@@ -212,8 +231,10 @@ int main(void) {
     // Testin stuff
     // the Panel
     auto testPanel = std::make_unique<Panel>();
-    testPanel -> setPosition(10, 10);
-    testPanel -> setSize(200, 80);
+    testPanel -> setPosition(10, 90);
+    testPanel -> setSize(400, 340);
+    testPanel -> setColor(BLUE);
+    //testPanel -> setPadding(20, 10);
     // the Label
     auto testLbl = std::make_unique<Label>("Hello", 16);
     testLbl -> setPosition(10, 10);
@@ -221,8 +242,8 @@ int main(void) {
     testLbl = nullptr;
 
     // The Button
-    Button testBtn = Button("The test Button", 60, 200, 10, 10);
-    testBtn.setPosition(300, 10);
+    // Button testBtn = Button("The test Button", 60, 200, 10, 10);
+    // testBtn.setPosition(300, 10);
 
     auto titleLbl = std::make_unique<Label>("My GUI Library!", 20);
     titleLbl -> setPosition(GetScreenWidth()/2.0f - titleLbl -> getTextSize()/2.0f, GetScreenHeight()/2.0f - titleLbl -> getFontSize()/2.0f);
@@ -230,13 +251,13 @@ int main(void) {
 
     while(!WindowShouldClose()) {
 
-        testBtn.Update();
+        //testBtn.Update();
 
         BeginDrawing();
         
         ClearBackground(RAYWHITE);
         titleLbl -> Draw();
-        testBtn.Draw();
+        //testBtn.Draw();
 
         testPanel -> Draw();
         
