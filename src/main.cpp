@@ -101,6 +101,14 @@ class Panel : public RectControl{
     }
     Vector2 getPadding() {return padding;}
 
+    Rectangle getRect() {
+        float x = getWorldPosition().x;
+        float y = getWorldPosition().y;
+        float w = getSize().x + padding.x;
+        float h = getSize().y + padding.y;
+        return Rectangle{x, y, w, h};
+    }
+
     void Draw() override{
         // TODO: Add rounded corners
         DrawRectangle(getWorldPosition().x, getWorldPosition().y, size.x + padding.x, size.y + padding.y, color);
@@ -123,10 +131,11 @@ class Label : public Control{
         textSize = MeasureText(text.c_str(), fontSize);
     }
 
-    void setText(std::string& newText) {
+    void setText(std::string newText) {
         text = newText;
         textSize = MeasureText(text.c_str(), fontSize);
     }
+
     std::string getText() const {return text;}
 
     void setFontSize(int newFontSize) {
@@ -139,6 +148,7 @@ class Label : public Control{
     void setPosition(int x, int y) override {
         Control::setPosition(x, y);
     }
+
     void setTextColor(Color newColor) {
         color = newColor;
     }
@@ -191,7 +201,9 @@ class Button : public RectControl{
         reCalcLayout();
     }
 
-    void setText(std::string& newText) {
+    Vector2 getPadding() {return panel -> padding;}
+
+    void setText(std::string newText) {
         label -> setText(newText);
         reCalcLayout();
     }
@@ -249,15 +261,18 @@ int main(void) {
     InitWindow(windowWidth, windowHeight, "My GUI Library");
     SetTargetFPS(60);
 
+    // ========================================================
     // Testin stuff
+    //
     // the Panel
     auto testPanel = std::make_unique<Panel>();
     testPanel -> setPosition(10, 90);
     testPanel -> setSize(400, 340);
     testPanel -> setColor(BLUE);
-    //testPanel -> setPadding(20, 10);
+
     // the Label
     auto testLbl = std::make_unique<Label>("Hello", 16);
+    testLbl -> setText("sjdhcsjhcjshvdj");
     testLbl -> setPosition(10, 10);
     testPanel -> addChild(std::move(testLbl));
     testLbl = nullptr;
@@ -265,8 +280,11 @@ int main(void) {
     // The Button
     auto testBtn = std::make_unique<Button>("The test Button");
     testBtn -> setPosition(40, 40);
+    testBtn -> setPadding(10, 10);
     testPanel -> addChild(std::move(testBtn));
     testBtn = nullptr;
+
+    // ========================================================
 
     auto titleLbl = std::make_unique<Label>("My GUI Library!", 20);
     titleLbl -> setPosition(GetScreenWidth()/2.0f - titleLbl -> getTextSize()/2.0f, GetScreenHeight()/2.0f - titleLbl -> getFontSize()/2.0f);
