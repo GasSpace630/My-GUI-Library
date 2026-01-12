@@ -5,6 +5,7 @@
 #include "string"
 #include <algorithm>
 #include <memory>
+#include <pthread.h>
 #include <vector>
 
 // Base UI class 'Control'
@@ -82,7 +83,7 @@ class RectControl : public Control{
 
     Vector2 getSize() const {return size;}
 
-    Rectangle getRect() const {return {position.x, position.y, size.x, size.y};}
+    Rectangle getRect() {return {getWorldPosition().x, getWorldPosition().y, size.x, size.y};}
 };
 
 // Used as a Background to hold Ui elements
@@ -98,10 +99,11 @@ class Panel : public RectControl{
     void setPadding(int xPadding, int yPadding) {
         padding = Vector2{(float)xPadding, (float)yPadding};
     }
+    Vector2 getPadding() {return padding;}
 
     void Draw() override{
         // TODO: Add rounded corners
-        DrawRectangle(position.x, position.y, size.x + padding.x, size.y + padding.y, color);
+        DrawRectangle(getWorldPosition().x, getWorldPosition().y, size.x + padding.x, size.y + padding.y, color);
         Control::Draw();
     }
 };
@@ -121,7 +123,7 @@ class Label : public Control{
         textSize = MeasureText(text.c_str(), fontSize);
     }
 
-    void setText(std::string newText) {
+    void setText(std::string& newText) {
         text = newText;
         textSize = MeasureText(text.c_str(), fontSize);
     }
@@ -130,9 +132,9 @@ class Label : public Control{
     void setFontSize(int newFontSize) {
         fontSize = newFontSize;
     }
-    int getFontSize() {return fontSize;}
+    int getFontSize() const {return fontSize;}
 
-    int getTextSize() {return textSize;}
+    int getTextSize() const {return textSize;}
 
     void setPosition(int x, int y) override {
         Control::setPosition(x, y);
@@ -153,8 +155,8 @@ class Label : public Control{
 // TODO: Refactor for parent-child system.
 class Button : public RectControl{
     private:
-    Label label;
-    Panel background;
+    Label* label;            // Text
+    Panel* panel;              // Background
     // Default button colors
     Color normalColor = GRAY;
     Color hoveredColor = LIGHTGRAY;
@@ -164,59 +166,78 @@ class Button : public RectControl{
     bool pressed = false;
     bool hovered = false;
 
-    Button(std::string btnText, int x, int y, int xPadding, int yPadding)
-    : label(btnText, 16)
-    {
-        setPosition(x, y);
-        label.setText(btnText);
-        // to center text
-        float textWidth = label.getTextSize() + xPadding; 
-        float textHeight = 16 + yPadding;
-        float centerX = position.x + (textWidth / 2.0f) + (xPadding/2.0f);
-        float centerY = position.y + (textHeight / 2.0f) + (yPadding/2.0f);
-        // --- Default values
-        background.setPosition(position.x, position.y);
-        background.color = GRAY;
-        background.setSize(textWidth, textHeight);
-        label.setPosition(centerX - (textWidth/2), centerY - (textHeight/2));
+    Button(std::string text){
+        auto pnl = std::make_unique<Panel>();
+        panel = pnl.get();
+        addChild(std::move(pnl));
+
+        auto lbl = std::make_unique<Label>(text, 16);
+        label = lbl.get();
+        addChild(std::move(lbl));
+
+        panel -> setPadding(4, 4);
+        panel -> setColor(normalColor);
+
+        reCalcLayout();
     }
 
     // Chnages the position of the button (panel and text)
     void setPosition(int x, int y) override{
         Control::setPosition(x, y);
-        background.setPosition(position.x, position.y);
-        int testX = position.x + (background.getSize().x/2.0f) - MeasureText(label.getText().c_str(), label.getFontSize())/2.0f;
-        int textY = position.y + (background.getSize().y/2.0f) - (label.getFontSize()/2.0f);
-        label.setPosition(testX, textY);
+    }
+
+    void setPadding(int x, int y) {
+        panel -> setPadding(x, y);
+        reCalcLayout();
+    }
+
+    void setText(std::string& newText) {
+        label -> setText(newText);
+        reCalcLayout();
+    }
+
+    void reCalcLayout() {
+        float textWidth = label -> getTextSize();
+        float textHeight = label -> getFontSize();
+
+        float width = textWidth + panel -> getPadding().x * 2;
+        float height = textHeight + panel -> getPadding().y * 2;
+
+        setSize(width, height);
+
+        panel -> setPosition(0, 0); // Local position
+        panel -> setSize(width, height);
+
+        label -> setPosition((width - textWidth) / 2.0f, (height - textHeight) / 2.0f);
     }
 
     // Pressing and hovering
     void Update() override{
         Vector2 mousePosition = GetMousePosition();
-        Rectangle bgRect = background.getRect();
+        Rectangle bgRect = panel -> getRect();
 
         hovered = CheckCollisionPointRec(mousePosition, bgRect);
         if (hovered) {
-            background.color = hoveredColor;
+            panel -> color = hoveredColor;
             if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
-                background.color = pressedColor;
+                panel -> color = pressedColor;
                 pressed = true;
             }
             if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
-                background.color = hoveredColor;
+                panel -> color = hoveredColor;
                 pressed = false;
             }
         }
         else {
-            background.color = normalColor;
+            panel -> color = normalColor;
             hovered = false;
             pressed = false;
         }
+        Control::Update();
     }
 
     void Draw() override{
-        background.Draw();
-        label.Draw();
+        Control::Draw();
     }
 };
 
@@ -242,8 +263,10 @@ int main(void) {
     testLbl = nullptr;
 
     // The Button
-    // Button testBtn = Button("The test Button", 60, 200, 10, 10);
-    // testBtn.setPosition(300, 10);
+    auto testBtn = std::make_unique<Button>("The test Button");
+    testBtn -> setPosition(40, 40);
+    testPanel -> addChild(std::move(testBtn));
+    testBtn = nullptr;
 
     auto titleLbl = std::make_unique<Label>("My GUI Library!", 20);
     titleLbl -> setPosition(GetScreenWidth()/2.0f - titleLbl -> getTextSize()/2.0f, GetScreenHeight()/2.0f - titleLbl -> getFontSize()/2.0f);
@@ -251,13 +274,12 @@ int main(void) {
 
     while(!WindowShouldClose()) {
 
-        //testBtn.Update();
+        testPanel -> Update();
 
         BeginDrawing();
         
         ClearBackground(RAYWHITE);
         titleLbl -> Draw();
-        //testBtn.Draw();
 
         testPanel -> Draw();
         
