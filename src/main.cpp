@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <memory>
 #include <pthread.h>
+#include <string>
 #include <vector>
 
 // Base UI class 'Control'
@@ -86,6 +87,89 @@ class RectControl : public Control{
     Rectangle getRect() {return {getWorldPosition().x, getWorldPosition().y, size.x, size.y};}
 };
 
+// Display Text inside the window
+class Label : public Control{
+    private:
+    std::string text = "";
+    int fontSize = 16;
+    int textSize = 0;
+    Color color = BLACK;
+
+    public:
+
+    explicit Label(const std::string newText, int newFontSize)
+    : text(newText), fontSize(newFontSize){
+        textSize = MeasureText(text.c_str(), fontSize);
+    }
+
+    void setText(const std::string& newText) {
+        text = newText;
+        textSize = MeasureText(text.c_str(), fontSize);
+    }
+
+    std::string getText() const {return text;}
+
+    void setFontSize(int newFontSize) {
+        fontSize = newFontSize;
+    }
+    int getFontSize() const {return fontSize;}
+
+    int getTextSize() const {return textSize;}
+
+    void setPosition(int x, int y) override {
+        Control::setPosition(x, y);
+    }
+
+    void setTextColor(Color newColor) {
+        color = newColor;
+    }
+
+    Color getTextColor() {return color;}
+
+    void Draw() override{
+        if (!visible) {return;}
+
+        DrawText(text.c_str(), getWorldPosition().x, getWorldPosition().y, fontSize, color);
+        Control::Draw();
+    }
+};
+
+// To get them label functions
+class TextElement {
+protected:
+    Label* label = nullptr;
+
+public:
+    void setText(const std::string& newText) {
+        if (label) {label -> setText(newText);}
+    }
+
+    std::string getText() {
+        return label ? label -> getText() : "";
+    }
+
+    void setFontSize(int newFontSize) {
+        if (label) {label -> setFontSize(newFontSize);}
+    }
+
+    int getFontSize() {
+        return label ? label -> getFontSize() : 0;
+    }
+
+    int getTextSize() {
+        return label ? label -> getTextSize() : 0;
+    }
+
+    void setTextColor(Color newColor) {
+        if (label) {label -> setTextColor(newColor);}
+    }
+
+    Color getTextColor() {
+        return label ? label -> getTextColor() : BLACK;// return black if no color is set
+    }
+};
+
+
 // Used as a Background to hold Ui elements
 class Panel : public RectControl{
     public:
@@ -116,54 +200,9 @@ class Panel : public RectControl{
     }
 };
 
-// Display Text inside the window
-class Label : public Control{
-    private:
-    std::string text = "";
-    int fontSize = 16;
-    int textSize = 0;
-    Color color = BLACK;
-
-    public:
-
-    explicit Label(const std::string newText, int newFontSize)
-    : text(newText), fontSize(newFontSize){
-        textSize = MeasureText(text.c_str(), fontSize);
-    }
-
-    void setText(std::string newText) {
-        text = newText;
-        textSize = MeasureText(text.c_str(), fontSize);
-    }
-
-    std::string getText() const {return text;}
-
-    void setFontSize(int newFontSize) {
-        fontSize = newFontSize;
-    }
-    int getFontSize() const {return fontSize;}
-
-    int getTextSize() const {return textSize;}
-
-    void setPosition(int x, int y) override {
-        Control::setPosition(x, y);
-    }
-
-    void setTextColor(Color newColor) {
-        color = newColor;
-    }
-
-    void Draw() override{
-        if (!visible) {return;}
-
-        DrawText(text.c_str(), getWorldPosition().x, getWorldPosition().y, fontSize, color);
-        Control::Draw();
-    }
-};
-
 // A button to press
 // TODO: Refactor for parent-child system.
-class Button : public RectControl{
+class Button : public RectControl, public TextElement{
     private:
     Label* label;            // Text
     Panel* panel;              // Background
@@ -202,11 +241,6 @@ class Button : public RectControl{
     }
 
     Vector2 getPadding() {return panel -> padding;}
-
-    void setText(std::string newText) {
-        label -> setText(newText);
-        reCalcLayout();
-    }
 
     void reCalcLayout() {
         float textWidth = label -> getTextSize();
@@ -253,6 +287,7 @@ class Button : public RectControl{
     }
 };
 
+
 // The Mainstuff
 int main(void) {
     int windowWidth = 960;
@@ -281,6 +316,7 @@ int main(void) {
     auto testBtn = std::make_unique<Button>("The test Button");
     testBtn -> setPosition(40, 40);
     testBtn -> setPadding(10, 10);
+    testBtn -> setText("std::string &newText");
     testPanel -> addChild(std::move(testBtn));
     testBtn = nullptr;
 
