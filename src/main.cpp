@@ -4,10 +4,25 @@
 #include "vector"
 #include "string"
 #include <algorithm>
+#include <endian.h>
 #include <memory>
 #include <pthread.h>
 #include <string>
 #include <vector>
+
+
+// For borders , margins and stuff
+struct Edges {
+    float left, right, top, bottom;
+
+    static Edges All(float v) {
+        return Edges{v,v,v,v};
+    }
+
+    static Edges Symmatric(float horizontal, float vertical) {
+        return Edges{horizontal, horizontal, vertical, vertical};
+    }
+};
 
 // Base UI class 'Control'
 class Control {
@@ -77,6 +92,11 @@ class RectControl : public Control{
     protected:
     Vector2 size = Vector2{0, 0};
 
+    // Layout stuff
+    Edges padding;
+    Edges border;
+    Edges margin;
+
     public:
     void setSize(int width, int height) {
         size = Vector2{(float)width, (float)height};
@@ -84,13 +104,63 @@ class RectControl : public Control{
 
     Vector2 getSize() const {return size;}
 
-    Rectangle getRect() {return {getWorldPosition().x, getWorldPosition().y, size.x, size.y};}
+    // padding
+    void setPadding(const Edges& paddingEdges) {padding = paddingEdges;}
+    void setPadding(float all) {padding = Edges::All(all);}
+    void setPadding(float horizontal, float vertical) {padding = Edges::Symmatric(horizontal, vertical);}
+    Edges getPadding() {return padding;}
+
+    //border
+    void setBorder(const Edges& borderEdges) {border = borderEdges;}
+    void setBorder(float all) {border = Edges::All(all);}
+    void setBorder(float horizontal, float vertical) {border = Edges::Symmatric(horizontal, vertical);}
+    Edges getBorder() {return border;}
+
+    //margin
+    void setMargin(const Edges& marginEdges) {margin = marginEdges;}
+    void setMargin(float all) {margin = Edges::All(all);}
+    Edges getMargin() {return margin;}
+
+    // The actual rect
+    Rectangle getOuterRect() {
+        Vector2 wp = getWorldPosition();
+        return {wp.x, wp.y, size.x, size.y};
+    }
+
+    // for layout stuff
+    Rectangle getLayoutRect() {
+        Rectangle r = getOuterRect();
+        return {
+            r.x - margin.left,
+            r.y - margin.top,
+            r.width + margin.left + margin.right,
+            r.height + margin.top + margin.bottom
+        };
+    }
+
+    Rectangle getContentRect() {
+        Rectangle r = getOuterRect();
+        float contentW = r.width  - (padding.left + padding.right) - (border.left + border.right);
+        float contentH = r.height - (padding.top  + padding.bottom) - (border.top  + border.bottom);
+        // Avoid negative values
+        contentW = std::max(0.0f, contentW);
+        contentH = std::max(0.0f, contentH);
+
+        return {
+            r.x + padding.left + border.left,
+            r.y + padding.top + border.top,
+            contentW,
+            contentH
+        };
+    }
 };
 
 // Display Text inside the window
 class Label : public Control{
     private:
     std::string text = "";
+    Font font = GetFontDefault();
+    float spacing = 0.0f;
     int fontSize = 16;
     int textSize = 0;
     Color color = BLACK;
@@ -116,6 +186,11 @@ class Label : public Control{
 
     int getTextSize() const {return textSize;}
 
+    Vector2 getTextBounds() const {
+        return MeasureTextEx(font, text.c_str(), fontSize, spacing);
+    }
+
+
     void setPosition(int x, int y) override {
         Control::setPosition(x, y);
     }
@@ -134,7 +209,7 @@ class Label : public Control{
     }
 };
 
-// To get them label functions
+// To get them label text related functions
 class TextElement {
 protected:
     Label* label = nullptr;
@@ -174,119 +249,135 @@ public:
 class Panel : public RectControl{
     private:
     Color color = WHITE;
-    Vector2 padding = Vector2{0, 0};
-    
+    Color borderColor = WHITE;
+
     public:
 
     void setColor(Color newColor) {
         color = newColor;
     }
 
-    void setPadding(int xPadding, int yPadding) {
-        padding = Vector2{(float)xPadding, (float)yPadding};
-    }
-    Vector2 getPadding() {return padding;}
+    Color getColor() {return color;}
 
-    Rectangle getRect() {
-        float x = getWorldPosition().x;
-        float y = getWorldPosition().y;
-        float w = getSize().x + padding.x;
-        float h = getSize().y + padding.y;
-        return Rectangle{x, y, w, h};
+    void setBorderColor(Color newColor) {
+        borderColor = newColor;
     }
 
-    void Draw() override{
-        // TODO: Add rounded corners
-        DrawRectangle(getWorldPosition().x, getWorldPosition().y, size.x + padding.x, size.y + padding.y, color);
-        Control::Draw();
-    }
+    Color getBorderColor() {return borderColor;}
+
+    void Draw() override {
+    Rectangle outer = getOuterRect();
+    Rectangle content = getContentRect();
+
+    // background ONLY
+    DrawRectangleRec(content, color);
+
+    // border inside outer rect
+    Edges b = getBorder();
+
+    if (b.left > 0)
+        DrawRectangle(outer.x, outer.y, b.left, outer.height, borderColor);
+    if (b.right > 0)
+        DrawRectangle(outer.x + outer.width - b.right, outer.y, b.right, outer.height, borderColor);
+    if (b.top > 0)
+        DrawRectangle(outer.x, outer.y, outer.width, b.top, borderColor);
+    if (b.bottom > 0)
+        DrawRectangle(outer.x, outer.y + outer.height - b.bottom, outer.width, b.bottom, borderColor);
+
+    Control::Draw();
+}
+
 };
 
 // A button to press
-// TODO: Refactor for parent-child system.
-class Button : public RectControl, public TextElement{
-    private:
-    Label* label;            // Text
-    Panel* panel;              // Background
-    // Default button colors
-    Color normalColor = GRAY;
+// FIXME: test clips through the button, maybe problem in drawing label test
+class Button : public RectControl, public TextElement {
+private:
+    // Default colors
+    Color normalColor  = GRAY;
     Color hoveredColor = LIGHTGRAY;
     Color pressedColor = DARKGRAY;
 
-    public:
-    bool pressed = false;
+    // States
     bool hovered = false;
+    bool pressed = false;
 
-    Button(std::string text){
-        auto pnl = std::make_unique<Panel>();
-        panel = pnl.get();
-        addChild(std::move(pnl));
+public:
+    Button(const std::string& text) {
+
+        setPadding(Edges::All(6));
 
         auto lbl = std::make_unique<Label>(text, 16);
         label = lbl.get();
         addChild(std::move(lbl));
 
-        panel -> setPadding(4, 4);
-        panel -> setColor(normalColor);
-
-        reCalcLayout();
+        recalcLayout();
     }
 
-    // Chnages the position of the button (panel and text)
-    void setPosition(int x, int y) override{
-        Control::setPosition(x, y);
+   void recalcLayout() {
+        Vector2 text = label->getTextBounds();
+
+        float minW = 60;
+        float minH = 30;
+
+        float w = std::max(minW, text.x + padding.left + padding.right);
+        float h = std::max(minH, text.y + padding.top  + padding.bottom);
+
+        setSize(w, h);
+
+        Rectangle content = getContentRect();
+
+        float x = content.x + (content.width  - text.x) / 2.0f;
+        float y = content.y + (content.height - text.y) / 2.0f;
+        y -= label->getFontSize() * 0.2f;
+
+        label->setPosition(x, y);
     }
 
-    void setPadding(int x, int y) {
-        panel -> setPadding(x, y);
-        reCalcLayout();
-    }
 
-    Vector2 getPadding() {return panel -> padding;}
+    void Update() override {
+        Vector2 mouse = GetMousePosition();
+        Rectangle r = getOuterRect();
 
-    void reCalcLayout() {
-        float textWidth = label -> getTextSize();
-        float textHeight = label -> getFontSize();
+        hovered = CheckCollisionPointRec(mouse, r);
 
-        float width = textWidth + panel -> getPadding().x * 2;
-        float height = textHeight + panel -> getPadding().y * 2;
-
-        setSize(width, height);
-
-        panel -> setPosition(0, 0); // Local position
-        panel -> setSize(width, height);
-
-        label -> setPosition((width - textWidth) / 2.0f, (height - textHeight) / 2.0f);
-    }
-
-    // Pressing and hovering
-    void Update() override{
-        Vector2 mousePosition = GetMousePosition();
-        Rectangle bgRect = panel -> getRect();
-
-        hovered = CheckCollisionPointRec(mousePosition, bgRect);
-        if (hovered) {
-            panel -> color = hoveredColor;
-            if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
-                panel -> color = pressedColor;
-                pressed = true;
-            }
-            if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
-                panel -> color = hoveredColor;
-                pressed = false;
-            }
+        if (hovered && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            pressed = true;
         }
-        else {
-            panel -> color = normalColor;
-            hovered = false;
+        if (pressed && IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
             pressed = false;
         }
+
         Control::Update();
     }
 
-    void Draw() override{
-        Control::Draw();
-    }
+    void Draw() override {
+    Rectangle r = getOuterRect();
+
+    Color bg =
+        pressed ? pressedColor :
+        hovered ? hoveredColor :
+                  normalColor;
+
+    DrawRectangleRec(r, bg);
+
+    // 🔒 Clip children to button rect
+    Rectangle c = getContentRect();
+
+    BeginScissorMode(
+        (int)c.x,
+        (int)c.y,
+        (int)c.width,
+        (int)c.height
+    );
+
+
+
+    Control::Draw(); // draw label
+
+    EndScissorMode();
+}
+
 };
 
 
@@ -304,7 +395,9 @@ int main(void) {
     // the Panel
     auto testPanel = std::make_unique<Panel>();
     testPanel -> setPosition(10, 90);
-    testPanel -> setSize(800, 400);
+    testPanel -> setSize(400, 200);
+    testPanel -> setBorderColor(BLUE);
+    testPanel -> setBorder(6, 6);
     testPanel -> setColor(RAYWHITE);
 
     // the Label
@@ -317,8 +410,7 @@ int main(void) {
     // The Button
     auto testBtn = std::make_unique<Button>("The test Button");
     testBtn -> setPosition(40, 40);
-    testBtn -> setPadding(10, 10);
-    testBtn -> setText("std::string &newText");
+    testBtn -> setTextColor(ORANGE);
     testPanel -> addChild(std::move(testBtn));
     testBtn = nullptr;
 
