@@ -172,9 +172,11 @@ public:
 
 // Used as a Background to hold Ui elements
 class Panel : public RectControl{
-    public:
+    private:
     Color color = WHITE;
     Vector2 padding = Vector2{0, 0};
+    
+    public:
 
     void setColor(Color newColor) {
         color = newColor;
@@ -302,8 +304,8 @@ int main(void) {
     // the Panel
     auto testPanel = std::make_unique<Panel>();
     testPanel -> setPosition(10, 90);
-    testPanel -> setSize(400, 340);
-    testPanel -> setColor(BLUE);
+    testPanel -> setSize(800, 400);
+    testPanel -> setColor(RAYWHITE);
 
     // the Label
     auto testLbl = std::make_unique<Label>("Hello", 16);
@@ -321,10 +323,12 @@ int main(void) {
     testBtn = nullptr;
 
     // ========================================================
-
+    // Title Label
     auto titleLbl = std::make_unique<Label>("My GUI Library!", 20);
-    titleLbl -> setPosition(GetScreenWidth()/2.0f - titleLbl -> getTextSize()/2.0f, GetScreenHeight()/2.0f - titleLbl -> getFontSize()/2.0f);
-    titleLbl -> setTextColor(GRAY);
+    titleLbl -> setPosition(testPanel->getSize().x/2.0 - (titleLbl->getTextSize()/2.0), testPanel->getSize().y/2.0 - (titleLbl->getFontSize()));
+    titleLbl -> setTextColor(BLUE);
+    testPanel -> addChild(std::move(titleLbl));
+    titleLbl = nullptr;
 
     while(!WindowShouldClose()) {
 
@@ -332,8 +336,7 @@ int main(void) {
 
         BeginDrawing();
         
-        ClearBackground(RAYWHITE);
-        titleLbl -> Draw();
+        ClearBackground(BLACK);
 
         testPanel -> Draw();
         
