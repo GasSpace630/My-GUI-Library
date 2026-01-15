@@ -213,10 +213,12 @@ class Label : public Control{
 class TextElement {
 protected:
     Label* label = nullptr;
+    virtual void onTextChanged() {}
 
 public:
     void setText(const std::string& newText) {
         if (label) {label -> setText(newText);}
+        onTextChanged();
     }
 
     std::string getText() {
@@ -290,7 +292,6 @@ class Panel : public RectControl{
 };
 
 // A button to press
-// FIXME: test clips through the button, maybe problem in drawing label test
 class Button : public RectControl, public TextElement {
 private:
     // Default colors
@@ -314,25 +315,33 @@ public:
         reCalcLayout();
     }
 
-   void reCalcLayout() {
-        Vector2 text = label->getTextBounds();
+    void onTextChanged() override{
+        reCalcLayout();
+    }
 
-        // Avoid negative or very small size
+    void reCalcLayout() {
+        Vector2 textDim = label->getTextBounds();
+
+        // Avoid negative values
         float minW = 60;
         float minH = 30;
 
-        float w = std::max(minW, text.x + padding.left + padding.right);
-        float h = std::max(minH, text.y + padding.top  + padding.bottom);
+        float w = std::max(minW, textDim.x + padding.left + padding.right + border.left + border.right);
+        float h = std::max(minH, textDim.y + padding.top  + padding.bottom + border.top  + border.bottom);
 
         setSize(w, h);
 
-        Rectangle content = getContentRect();
-        
-        // getting the Center position
-        float x = content.x + (content.width  - text.x) / 2.0f;
-        float y = content.y + (content.height - text.y) / 2.0f;
+        // Use LOCAL coordinates
+        float localContentX = padding.left + border.left;
+        float localContentY = padding.top  + border.top;
+        float localContentW = w - (padding.left + padding.right) - (border.left + border.right);
+        float localContentH = h - (padding.top  + padding.bottom) - (border.top  + border.bottom);
 
-        label->setPosition(x, y);
+        // Centering text
+        float x = localContentX + (localContentW - textDim.x) / 2.0f;
+        float y = localContentY + (localContentH - textDim.y) / 2.0f;
+
+        label->setPosition((int)x, (int)y);
     }
 
 
@@ -381,15 +390,15 @@ int main(void) {
     // the Panel
     auto testPanel = std::make_unique<Panel>();
     testPanel -> setPosition(10, 90);
-    testPanel -> setSize(400, 200);
+    testPanel -> setSize(800, 400);
     testPanel -> setBorderColor(BLUE);
     testPanel -> setBorder(6, 6);
     testPanel -> setColor(RAYWHITE);
 
     // the Label
     auto testLbl = std::make_unique<Label>("Hello", 16);
-    testLbl -> setText("sjdhcsjhcjshvdj");
-    testLbl -> setPosition(10, 10);
+    testLbl -> setText("Test Label!!!!!");
+    testLbl -> setPosition(100, 230);
     testPanel -> addChild(std::move(testLbl));
     testLbl = nullptr;
 
@@ -397,6 +406,7 @@ int main(void) {
     auto testBtn = std::make_unique<Button>("The test Button");
     testBtn -> setPosition(40, 40);
     testBtn -> setTextColor(ORANGE);
+    testBtn -> setText("Blick");
     testPanel -> addChild(std::move(testBtn));
     testBtn = nullptr;
 
