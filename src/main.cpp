@@ -160,7 +160,7 @@ class Label : public Control{
     private:
     std::string text = "";
     Font font = GetFontDefault();
-    float spacing = 0.0f;
+    float spacing = 1.0f;
     int fontSize = 16;
     int textSize = 0;
     Color color = BLACK;
@@ -311,12 +311,13 @@ public:
         label = lbl.get();
         addChild(std::move(lbl));
 
-        recalcLayout();
+        reCalcLayout();
     }
 
-   void recalcLayout() {
+   void reCalcLayout() {
         Vector2 text = label->getTextBounds();
 
+        // Avoid negative or very small size
         float minW = 60;
         float minH = 30;
 
@@ -326,10 +327,10 @@ public:
         setSize(w, h);
 
         Rectangle content = getContentRect();
-
+        
+        // getting the Center position
         float x = content.x + (content.width  - text.x) / 2.0f;
         float y = content.y + (content.height - text.y) / 2.0f;
-        y -= label->getFontSize() * 0.2f;
 
         label->setPosition(x, y);
     }
@@ -352,31 +353,16 @@ public:
     }
 
     void Draw() override {
-    Rectangle r = getOuterRect();
 
-    Color bg =
-        pressed ? pressedColor :
-        hovered ? hoveredColor :
-                  normalColor;
+        Color bg =
+            pressed ? pressedColor :
+            hovered ? hoveredColor :normalColor;
 
-    DrawRectangleRec(r, bg);
+        Rectangle r = getOuterRect();
+        DrawRectangleRec(r, bg);
 
-    // 🔒 Clip children to button rect
-    Rectangle c = getContentRect();
-
-    BeginScissorMode(
-        (int)c.x,
-        (int)c.y,
-        (int)c.width,
-        (int)c.height
-    );
-
-
-
-    Control::Draw(); // draw label
-
-    EndScissorMode();
-}
+        Control::Draw(); // draw label
+    }
 
 };
 
