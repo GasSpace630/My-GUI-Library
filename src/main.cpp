@@ -24,6 +24,13 @@ struct Edges {
     }
 };
 
+// for style data on buttons
+struct Style {
+    Color bgColor;
+    Color borderColor;
+    Edges borderThickness;
+};
+
 // Base UI class 'Control'
 class Control {
     protected:
@@ -111,9 +118,9 @@ class RectControl : public Control{
     Edges getPadding() {return padding;}
 
     //border
-    void setBorder(const Edges& borderEdges) {border = borderEdges;}
-    void setBorder(float all) {border = Edges::All(all);}
-    void setBorder(float horizontal, float vertical) {border = Edges::Symmatric(horizontal, vertical);}
+    void setBorderThickness(const Edges& borderEdges) {border = borderEdges;}
+    void setBorderThickness(float all) {border = Edges::All(all);}
+    void setBorderThickness(float horizontal, float vertical) {border = Edges::Symmatric(horizontal, vertical);}
     Edges getBorder() {return border;}
 
     //margin
@@ -268,40 +275,49 @@ class Panel : public RectControl{
     Color getBorderColor() {return borderColor;}
 
     void Draw() override {
-    Rectangle outer = getOuterRect();
-    Rectangle content = getContentRect();
+        Rectangle outer = getOuterRect();
+        // Rectangle content = getContentRect();
 
-    // background ONLY
-    DrawRectangleRec(content, color);
+        // background ONLY
+        DrawRectangleRec(outer, color);
 
-    // border inside outer rect
-    Edges b = getBorder();
+        // border inside outer rect
+        Edges b = getBorder();
 
-    if (b.left > 0)
-        DrawRectangle(outer.x, outer.y, b.left, outer.height, borderColor);
-    if (b.right > 0)
-        DrawRectangle(outer.x + outer.width - b.right, outer.y, b.right, outer.height, borderColor);
-    if (b.top > 0)
-        DrawRectangle(outer.x, outer.y, outer.width, b.top, borderColor);
-    if (b.bottom > 0)
-        DrawRectangle(outer.x, outer.y + outer.height - b.bottom, outer.width, b.bottom, borderColor);
+        if (b.left > 0)
+            DrawRectangle(outer.x, outer.y, b.left, outer.height, borderColor);
+        if (b.right > 0)
+            DrawRectangle(outer.x + outer.width - b.right, outer.y, b.right, outer.height, borderColor);
+        if (b.top > 0)
+            DrawRectangle(outer.x, outer.y, outer.width, b.top, borderColor);
+        if (b.bottom > 0)
+            DrawRectangle(outer.x, outer.y + outer.height - b.bottom, outer.width, b.bottom, borderColor);
 
-    Control::Draw();
-}
+        Control::Draw();
+    }
 
 };
 
 // A button to press
-class Button : public RectControl, public TextElement {
+class Button : public Panel, public TextElement{
 private:
-    // Default colors
-    Color normalColor  = GRAY;
-    Color hoveredColor = LIGHTGRAY;
-    Color pressedColor = DARKGRAY;
+    // Default styles
+    Style normalStyle = { GRAY, DARKGRAY, Edges::All(2) };
+    Style hoverStyle  = { LIGHTGRAY, BLACK, Edges::All(2) };
+    Style pressStyle  = { DARKGRAY, BLACK, Edges::All(4) };
+
+    Style* currentStyle = &normalStyle;
 
     // States
     bool hovered = false;
     bool pressed = false;
+
+    void applyStyle() {
+        setColor(currentStyle -> bgColor);
+        setBorderColor(currentStyle -> borderColor);
+        setBorderThickness(currentStyle -> borderThickness);
+        reCalcLayout();
+    }
 
 public:
     Button(const std::string& text) {
@@ -323,19 +339,19 @@ public:
         Vector2 textDim = label->getTextBounds();
 
         // Avoid negative values
-        float minW = 60;
+        float minW = 30;
         float minH = 30;
 
-        float w = std::max(minW, textDim.x + padding.left + padding.right + border.left + border.right);
-        float h = std::max(minH, textDim.y + padding.top  + padding.bottom + border.top  + border.bottom);
+        float w = std::max(minW, textDim.x + getPadding().left + getPadding().right + getBorder().left + getBorder().right);
+        float h = std::max(minH, textDim.y + getPadding().top  + getPadding().bottom + getBorder().top  + getBorder().bottom);
 
         setSize(w, h);
 
         // Use LOCAL coordinates
-        float localContentX = padding.left + border.left;
-        float localContentY = padding.top  + border.top;
-        float localContentW = w - (padding.left + padding.right) - (border.left + border.right);
-        float localContentH = h - (padding.top  + padding.bottom) - (border.top  + border.bottom);
+        float localContentX = getPadding().left + getBorder().left;
+        float localContentY = getPadding().top  + getBorder().top;
+        float localContentW = w - (getPadding().left + getPadding().right) - (getBorder().left + getBorder().right);
+        float localContentH = h - (getPadding().top  + getPadding().bottom) - (getBorder().top  + getBorder().bottom);
 
         // Centering text
         float x = localContentX + (localContentW - textDim.x) / 2.0f;
@@ -357,20 +373,26 @@ public:
         if (pressed && IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
             pressed = false;
         }
+        if (hovered) {
+            if (pressed) {
+                currentStyle = &pressStyle;
+                applyStyle();
+            }
+            else {
+                currentStyle = &hoverStyle;
+                applyStyle();
+            }
+        }
+        else {
+            currentStyle = &normalStyle;
+            applyStyle();
+        }
 
         Control::Update();
     }
 
     void Draw() override {
-
-        Color bg =
-            pressed ? pressedColor :
-            hovered ? hoveredColor :normalColor;
-
-        Rectangle r = getOuterRect();
-        DrawRectangleRec(r, bg);
-
-        Control::Draw(); // draw label
+        Panel::Draw();
     }
 
 };
@@ -392,7 +414,7 @@ int main(void) {
     testPanel -> setPosition(10, 90);
     testPanel -> setSize(800, 400);
     testPanel -> setBorderColor(BLUE);
-    testPanel -> setBorder(6, 6);
+    testPanel -> setBorderThickness(6, 6);
     testPanel -> setColor(RAYWHITE);
 
     // the Label
@@ -406,7 +428,7 @@ int main(void) {
     auto testBtn = std::make_unique<Button>("The test Button");
     testBtn -> setPosition(40, 40);
     testBtn -> setTextColor(ORANGE);
-    testBtn -> setText("Blick");
+    //testBtn -> setText("Blick");
     testPanel -> addChild(std::move(testBtn));
     testBtn = nullptr;
 
